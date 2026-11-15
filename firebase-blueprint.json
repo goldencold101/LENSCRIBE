@@ -1,0 +1,278 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Authenticated Lenscribe user account, subscription tier, and scan credit balances.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Firebase Auth UID of the account owner."
+        },
+        "email": {
+          "type": "string",
+          "description": "User email address from Google Sign-In."
+        },
+        "displayName": {
+          "type": "string",
+          "description": "User display name."
+        },
+        "planTier": {
+          "type": "string",
+          "enum": ["free", "pro", "plus", "team"],
+          "description": "Active subscription tier."
+        },
+        "monthlyCreditsLimit": {
+          "type": "integer",
+          "description": "Monthly scan quota for the active plan."
+        },
+        "monthlyCreditsUsed": {
+          "type": "integer",
+          "description": "Scans consumed in the current monthly cycle."
+        },
+        "paygCredits": {
+          "type": "integer",
+          "description": "Purchased Pay-As-You-Go scan credits that do not expire."
+        },
+        "preferredCurrency": {
+          "type": "string",
+          "enum": ["USD", "NGN"],
+          "description": "Checkout display currency."
+        },
+        "paymentProvider": {
+          "type": "string",
+          "enum": ["none", "paddle", "lemonsqueezy", "polar", "paystack"],
+          "description": "Selected payment processor for subscriptions and credit packs."
+        },
+        "subscriptionStatus": {
+          "type": "string",
+          "enum": ["none", "active", "trialing", "past_due", "cancelled", "expired"],
+          "description": "Current subscription lifecycle state."
+        },
+        "subscriptionExpiresAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when the current paid subscription cycle ends."
+        },
+        "zeroRetentionEnabled": {
+          "type": "boolean",
+          "description": "When true, new scans can opt out of cloud persistence."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when profile was created (FieldValue.serverTimestamp())."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when profile was last updated (FieldValue.serverTimestamp())."
+        }
+      },
+      "required": [
+        "userId",
+        "displayName",
+        "planTier",
+        "monthlyCreditsLimit",
+        "monthlyCreditsUsed",
+        "paygCredits",
+        "preferredCurrency",
+        "paymentProvider",
+        "subscriptionStatus",
+        "zeroRetentionEnabled",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "ScanDocument": {
+      "title": "ScanDocument",
+      "description": "Transcribed multi-page document stored in the user's encrypted cloud history.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Firebase Auth UID of the owner."
+        },
+        "title": {
+          "type": "string",
+          "description": "Document title."
+        },
+        "markdown": {
+          "type": "string",
+          "description": "Structured Markdown transcription output."
+        },
+        "mode": {
+          "type": "string",
+          "enum": ["fast", "precision", "table"],
+          "description": "Outcome-based scanning mode."
+        },
+        "preset": {
+          "type": "string",
+          "enum": ["layout", "table", "line_breaks", "translate_en", "clean_punctuation", "code_math"],
+          "description": "Smart formatting preset applied."
+        },
+        "pageCount": {
+          "type": "integer",
+          "description": "Number of pages stitched in this scan batch."
+        },
+        "hasTable": {
+          "type": "boolean",
+          "description": "Whether structured tabular data was detected."
+        },
+        "zeroRetention": {
+          "type": "boolean",
+          "description": "True if workspace privacy mode is enabled."
+        },
+        "lowConfidenceTerms": {
+          "type": "array",
+          "description": "Terms flagged for quick Click-to-Verify review."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of creation."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of last edit."
+        }
+      },
+      "required": [
+        "userId",
+        "title",
+        "markdown",
+        "mode",
+        "preset",
+        "pageCount",
+        "hasTable",
+        "zeroRetention",
+        "lowConfidenceTerms",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "BillingOrder": {
+      "title": "BillingOrder",
+      "description": "Payment checkout record and granted credits ledger.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string"
+        },
+        "planId": {
+          "type": "string",
+          "enum": ["payg_50", "pro", "plus", "team"]
+        },
+        "provider": {
+          "type": "string",
+          "enum": ["paddle", "lemonsqueezy", "polar", "paystack"]
+        },
+        "currency": {
+          "type": "string",
+          "enum": ["USD", "NGN"]
+        },
+        "amountMinor": {
+          "type": "integer"
+        },
+        "creditsGranted": {
+          "type": "integer"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "completed", "cancelled"]
+        },
+        "reference": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "userId",
+        "planId",
+        "provider",
+        "currency",
+        "amountMinor",
+        "creditsGranted",
+        "status",
+        "reference",
+        "createdAt"
+      ]
+    },
+    "WorkflowAutomation": {
+      "title": "WorkflowAutomation",
+      "description": "Automated export or webhook trigger configured by the user.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "trigger": {
+          "type": "string",
+          "enum": ["on_scan_complete", "on_table_detected", "on_manual_export"]
+        },
+        "destinationType": {
+          "type": "string",
+          "enum": ["webhook_json", "accounting_csv", "paddle_sync", "paystack_sync"]
+        },
+        "endpointUrl": {
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "lastStatus": {
+          "type": "string",
+          "enum": ["idle", "delivered", "failed"]
+        },
+        "lastTriggeredAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "userId",
+        "name",
+        "trigger",
+        "destinationType",
+        "endpointUrl",
+        "enabled",
+        "lastStatus",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Per-user subscription tier, scan credits, and preferences."
+    },
+    "/users/{userId}/scans/{scanId}": {
+      "schema": { "$ref": "#/entities/ScanDocument" },
+      "description": "User-owned OCR scan documents and verification terms."
+    },
+    "/users/{userId}/billing_orders/{orderId}": {
+      "schema": { "$ref": "#/entities/BillingOrder" },
+      "description": "User-owned checkout orders and credit pack ledger."
+    },
+    "/users/{userId}/workflows/{workflowId}": {
+      "schema": { "$ref": "#/entities/WorkflowAutomation" },
+      "description": "User-owned automated webhook and export workflows."
+    }
+  }
+}

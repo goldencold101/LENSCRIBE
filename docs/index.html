@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lenscribe — Paper to Editable Text, in Seconds</title>
+  <meta name="description" content="Snap or upload receipts, handwritten notes, contracts, or whiteboards. Reorder pages and export cleanly to Word, Excel, PowerPoint, PDF, CSV, Markdown, or PNG cards." />
+  <style>
+    :root {
+      --bg: #070b0f;
+      --surface: #0e141b;
+      --surface-alt: #131c26;
+      --border: #1e2a38;
+      --text: #eef4f8;
+      --muted: #8fa3b8;
+      --primary: #2ce6b2;
+      --primary-dark: #07261e;
+      --accent: #38bdf8;
+      --radius: 14px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif;
+      background:
+        radial-gradient(circle at 50% 0%, rgba(44, 230, 178, 0.14), transparent 52%),
+        linear-gradient(to right, rgba(255,255,255,0.025) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255,255,255,0.025) 1px, transparent 1px),
+        var(--bg);
+      background-size: 100% 100%, 44px 44px, 44px 44px, 100% 100%;
+      color: var(--text);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: inherit; text-decoration: none; }
+    .container { max-width: 1080px; margin: 0 auto; padding: 0 20px; }
+
+    header {
+      position: sticky; top: 0; z-index: 20;
+      backdrop-filter: blur(12px);
+      background: rgba(7, 11, 15, 0.85);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav {
+      display: flex; align-items: center; justify-content: space-between;
+      height: 68px; gap: 16px;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 1.15rem; }
+    .brand-icon {
+      width: 34px; height: 34px; border-radius: 9px;
+      background: rgba(44, 230, 178, 0.14);
+      border: 1px solid rgba(44, 230, 178, 0.45);
+      display: grid; place-items: center; color: var(--primary);
+    }
+    .nav-links { display: flex; gap: 24px; color: var(--muted); font-size: 0.95rem; }
+    .nav-links a:hover { color: var(--text); }
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      padding: 11px 18px; border-radius: 10px; font-weight: 600; font-size: 0.95rem;
+      cursor: pointer; border: 1px solid transparent; transition: transform 0.15s ease, opacity 0.15s ease;
+    }
+    .btn:hover { transform: translateY(-1px); }
+    .btn-primary { background: var(--primary); color: var(--primary-dark); }
+    .btn-outline { background: rgba(255,255,255,0.03); border-color: var(--border); color: var(--text); }
+
+    .hero { text-align: center; padding: 72px 0 48px; }
+    .pill {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 6px 14px; border-radius: 999px;
+      background: rgba(44, 230, 178, 0.08);
+      border: 1px solid rgba(44, 230, 178, 0.35);
+      color: var(--primary); font-size: 0.78rem; font-weight: 700; letter-spacing: 0.06em;
+      text-transform: uppercase; margin-bottom: 22px;
+    }
+    .pill-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--primary); }
+    h1 {
+      font-size: clamp(2.2rem, 5.5vw, 4rem);
+      line-height: 1.08; letter-spacing: -0.03em; margin-bottom: 18px;
+    }
+    h1 span { color: var(--primary); }
+    .hero p.lead {
+      max-width: 650px; margin: 0 auto 28px; color: var(--muted); font-size: 1.08rem;
+    }
+    .hero-cta { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-bottom: 14px; }
+    .subnote { font-size: 0.84rem; color: var(--muted); }
+
+    .preview-window {
+      margin: 40px auto 0; max-width: 900px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 16px; overflow: hidden; text-align: left;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+    }
+    .window-bar {
+      display: flex; align-items: center; gap: 8px; padding: 12px 16px;
+      border-bottom: 1px solid var(--border); background: rgba(255,255,255,0.02);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.8rem; color: var(--muted);
+    }
+    .dot { width: 10px; height: 10px; border-radius: 50%; background: #2c3846; }
+    .preview-grid { display: grid; grid-template-columns: 1fr 1fr; }
+    .preview-left, .preview-right { padding: 24px; }
+    .preview-left { border-right: 1px solid var(--border); display: grid; place-items: center; }
+    .receipt-card {
+      width: 100%; max-width: 340px; background: #f3efe6; color: #1a1f24;
+      border-radius: 10px; padding: 18px; border: 2px solid var(--primary);
+      box-shadow: 0 0 0 4px rgba(44, 230, 178, 0.14);
+      font-size: 0.88rem;
+    }
+    .receipt-title { font-weight: 700; margin-bottom: 10px; border-bottom: 1px dashed #c8c0b0; padding-bottom: 6px; }
+    .receipt-row { display: flex; justify-content: space-between; padding: 4px 0; }
+    .receipt-total { border-top: 1px solid #c8c0b0; margin-top: 8px; padding-top: 6px; font-weight: 700; }
+    .seq-badges { display: flex; gap: 6px; margin-top: 12px; flex-wrap: wrap; }
+    .seq-chip {
+      font-size: 0.72rem; font-weight: 700; padding: 3px 8px; border-radius: 6px;
+      background: rgba(44, 230, 178, 0.14); color: var(--primary); border: 1px solid rgba(44, 230, 178, 0.35);
+    }
+    .code-out {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.82rem; color: #b9f6e3; line-height: 1.7;
+    }
+    .format-pills { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+    .format-pill {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.76rem; padding: 4px 10px; border-radius: 6px;
+      border: 1px solid var(--border); background: var(--surface-alt); color: var(--muted);
+    }
+
+    section { padding: 56px 0; }
+    h2 { font-size: clamp(1.6rem, 3.2vw, 2.2rem); margin-bottom: 10px; text-align: center; }
+    .section-lead { color: var(--muted); text-align: center; max-width: 620px; margin: 0 auto 36px; }
+
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+    .card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 22px;
+    }
+    .card h3 { font-size: 1.05rem; margin-bottom: 8px; color: var(--text); }
+    .card p { font-size: 0.92rem; color: var(--muted); }
+    .tag {
+      display: inline-block; font-size: 0.72rem; font-weight: 700; color: var(--primary);
+      text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;
+    }
+
+    .install-box {
+      background: linear-gradient(135deg, rgba(44,230,178,0.12), rgba(56,189,248,0.08));
+      border: 1px solid rgba(44, 230, 178, 0.4);
+      border-radius: 18px; padding: 32px;
+      display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 24px;
+    }
+    .install-box h3 { font-size: 1.4rem; margin-bottom: 6px; }
+    .install-steps { margin-top: 10px; padding-left: 18px; color: var(--muted); font-size: 0.92rem; }
+    .install-steps li { margin: 4px 0; }
+
+    .faq-list { max-width: 780px; margin: 0 auto; display: grid; gap: 12px; }
+    details {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; padding: 16px 18px;
+    }
+    summary { font-weight: 600; cursor: pointer; list-style: none; display: flex; justify-content: space-between; }
+    summary::after { content: "+"; color: var(--primary); font-weight: 700; }
+    details[open] summary::after { content: "−"; }
+    details p { margin-top: 10px; font-size: 0.92rem; color: var(--muted); }
+
+    footer {
+      border-top: 1px solid var(--border); padding: 28px 0 42px;
+      color: var(--muted); font-size: 0.88rem;
+      display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px;
+    }
+    footer a:hover { color: var(--primary); }
+
+    @media (max-width: 780px) {
+      .nav-links { display: none; }
+      .preview-grid, .grid-3 { grid-template-columns: 1fr; }
+      .preview-left { border-right: none; border-bottom: 1px solid var(--border); }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container nav">
+      <a href="#" class="brand">
+        <span class="brand-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <path d="M4 8V6a2 2 0 0 1 2-2h2M4 16v2a2 2 0 0 0 2 2h2m8-16h2a2 2 0 0 1 2 2v2m-4 12h2a2 2 0 0 0 2-2v-2"/>
+            <line x1="7" y1="12" x2="17" y2="12"/>
+          </svg>
+        </span>
+        <span>Lenscribe</span>
+      </a>
+      <nav class="nav-links">
+        <a href="#features">Features</a>
+        <a href="#how-it-works">How it works</a>
+        <a href="#install">Download APK</a>
+        <a href="#faq">FAQ</a>
+      </nav>
+      <a href="#install" class="btn btn-primary">Download Android App</a>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="hero">
+      <div class="pill"><span class="pill-dot"></span> Early Access • 3 Months Free Pro</div>
+      <h1>Paper to <span>editable text</span>, in seconds.</h1>
+      <p class="lead">
+        Snap or upload a receipt, contract, handwritten note, or whiteboard. Reorder pages cleanly and turn them into editable spreadsheets and documents ready for Word, Excel, PowerPoint, or PDF.
+      </p>
+      <div class="hero-cta">
+        <a href="#install" class="btn btn-primary apk-dl-link">Download Android APK (v1.0)</a>
+        <a href="#how-it-works" class="btn btn-outline">See how it works</a>
+      </div>
+      <p class="subnote">Android 7.0+ • Optional Zero-Data-Retention Mode • Offline SQLite Backup</p>
+
+      <div class="preview-window">
+        <div class="window-bar">
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          <span>lenscribe / android</span>
+        </div>
+        <div class="preview-grid">
+          <div class="preview-left">
+            <div>
+              <div class="receipt-card">
+                <div class="receipt-title">Corner Café — Receipt #2041</div>
+                <div class="receipt-row"><span>Flat white</span><span>4.50</span></div>
+                <div class="receipt-row"><span>Almond croissant</span><span>3.80</span></div>
+                <div class="receipt-row"><span>Sparkling water</span><span>2.20</span></div>
+                <div class="receipt-row receipt-total"><span>Total</span><span>10.50</span></div>
+              </div>
+              <div class="seq-badges">
+                <span class="seq-chip">#1 Queued</span>
+                <span class="seq-chip">#2 Queued</span>
+                <span class="seq-chip">Move / Reverse Order</span>
+              </div>
+            </div>
+          </div>
+          <div class="preview-right">
+            <div class="code-out">
+              # Corner Café – Receipt #2041<br /><br />
+              | Item | Price |<br />
+              | ---------------- | ----- |<br />
+              | Flat white | 4.50 |<br />
+              | Almond croissant | 3.80 |<br />
+              | Sparkling water | 2.20 |<br />
+              | **Total** | **10.50** |
+            </div>
+            <div class="format-pills">
+              <span class="format-pill">.docx</span>
+              <span class="format-pill">.xlsx</span>
+              <span class="format-pill">.pptx</span>
+              <span class="format-pill">.pdf</span>
+              <span class="format-pill">.csv</span>
+              <span class="format-pill">.md</span>
+              <span class="format-pill">.png</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="features">
+      <h2>Built for real paperwork, not clumsy PDFs</h2>
+      <p class="section-lead">Capture multi-page batches, fix ordering before scanning, edit extracted tables inline, and export everywhere.</p>
+      <div class="grid-3">
+        <div class="card">
+          <span class="tag">Capture &amp; Sequencing</span>
+          <h3>Multi-Page Ordering (#1, #2...)</h3>
+          <p>Queue up to 25 pages via Live Scanner or Photo Picker. Rotate, enhance contrast, trim margins, and reorder with Move Earlier, Move Later, or Reverse Order.</p>
+        </div>
+        <div class="card">
+          <span class="tag">Verify &amp; Edit</span>
+          <h3>Inline Spreadsheet &amp; Highlighting</h3>
+          <p>Review flagged numbers side-by-side with your scan, edit Markdown directly, or update rows and totals inside the built-in Table grid.</p>
+        </div>
+        <div class="card">
+          <span class="tag">Reliability &amp; Privacy</span>
+          <h3>Local SQLite Backup &amp; Zero-Retention</h3>
+          <p>Auto-mirrors cloud scans to an offline SQLite database with portable .json export/restore—or toggle Zero-Data-Retention Mode to keep scans strictly in memory.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="how-it-works">
+      <h2>How it works in 3 steps</h2>
+      <p class="section-lead">From paper stack to structured deliverables in under a minute.</p>
+      <div class="grid-3">
+        <div class="card">
+          <span class="tag">Step 01</span>
+          <h3>Snap &amp; Sequence</h3>
+          <p>Capture documents with CameraX or import from Photo Picker. Arrange page order (#1 → #N) and pick Fast, Precision, or Table mode.</p>
+        </div>
+        <div class="card">
+          <span class="tag">Step 02</span>
+          <h3>Verify &amp; Edit</h3>
+          <p>Check highlighted low-confidence terms against the original image and tweak any cell in the interactive spreadsheet grid.</p>
+        </div>
+        <div class="card">
+          <span class="tag">Step 03</span>
+          <h3>Export &amp; Sync</h3>
+          <p>Share as Word, Excel, PowerPoint, PDF, CSV, Markdown, or PNG cards—and keep synced backups across cloud &amp; local SQLite.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="install">
+      <div class="install-box">
+        <div style="flex: 1; min-width: 260px;">
+          <span class="tag">Direct Android Download • $0 Free Early Access</span>
+          <h3>Install Lenscribe for Android</h3>
+          <p style="color: var(--muted); font-size: 0.95rem;">
+            New workspaces unlock <strong>3 months of Pro</strong> (300 scans/month, 25-page batches, all 7 export formats, and HTTPS workflows) automatically at no charge.
+          </p>
+          <ol class="install-steps">
+            <li>Tap <strong>Download Lenscribe APK</strong> to save the signed installer.</li>
+            <li>Open the downloaded <code>.apk</code> file from your browser or Files app.</li>
+            <li>Allow <strong>Install unknown apps</strong> once when prompted by Android.</li>
+          </ol>
+        </div>
+        <div>
+          <a href="#install" class="btn btn-primary apk-dl-link">
+            Download Lenscribe APK
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <section id="faq">
+      <h2>Frequently Asked Questions</h2>
+      <p class="section-lead">Everything you need to know about Early Access, privacy, and exports.</p>
+      <div class="faq-list">
+        <details>
+          <summary>Is Lenscribe free during Early Access?</summary>
+          <p>Yes. Paid billing is paused until next year, and every signed-in account automatically receives a complimentary 3-month Pro pass with a live countdown in Pass &amp; Sync.</p>
+        </details>
+        <details>
+          <summary>What happens if I lose internet while scanning or editing?</summary>
+          <p>Lenscribe saves local records and scanned previews into an on-device Room SQLite database. You can restore unsynced items back to the cloud anytime or export/import a portable .json backup.</p>
+        </details>
+        <details>
+          <summary>Can I scan private documents without storing them?</summary>
+          <p>Yes. Enable Zero-Data-Retention Mode inside Pass &amp; Sync to keep documents strictly in memory and skip both Cloud Firestore and local SQLite backup storage.</p>
+        </details>
+        <details>
+          <summary>How do I delete my account and stored scans?</summary>
+          <p>Open Pass &amp; Sync → Privacy Notice &amp; Account Control → Delete Account &amp; All Data to permanently wipe your cloud profile, scan history, workflows, and local SQLite backup database.</p>
+        </details>
+      </div>
+    </section>
+  </main>
+
+  <footer class="container">
+    <div>© 2026 Lenscribe • Precision Document Workspace</div>
+    <div style="display: flex; gap: 18px;">
+      <a href="privacy.html">Privacy Policy</a>
+      <a href="mailto:samueloluwatunmininu539@gmail.com">Contact Support</a>
+    </div>
+  </footer>
+
+  <script>
+    (function () {
+      var host = window.location.hostname || "";
+      if (host.endsWith(".github.io")) {
+        var owner = host.split(".")[0];
+        var parts = window.location.pathname.split("/").filter(Boolean);
+        var repo = parts.length > 0 ? parts[0] : owner + ".github.io";
+        var releaseUrl = "https://github.com/" + owner + "/" + repo + "/releases/latest/download/Lenscribe-release.apk";
+        document.querySelectorAll(".apk-dl-link").forEach(function (el) {
+          el.setAttribute("href", releaseUrl);
+        });
+      }
+    })();
+  </script>
+</body>
+</html>

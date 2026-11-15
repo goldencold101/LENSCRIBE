@@ -1,0 +1,252 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global safety net: default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidPlanTier(tier) {
+      return tier in ['free', 'pro', 'plus', 'team'];
+    }
+
+    function isValidCurrency(currency) {
+      return currency in ['USD', 'NGN'];
+    }
+
+    function isValidProvider(provider) {
+      return provider in ['none', 'paddle', 'lemonsqueezy', 'polar', 'paystack'];
+    }
+
+    function isValidSubStatus(status) {
+      return status in ['none', 'active', 'trialing', 'past_due', 'cancelled', 'expired'];
+    }
+
+    function isValidHttpsWebhookUrl(url) {
+      return url is string && url.size() <= 500 &&
+             (url == '' ||
+              (url.matches('^https://[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}(/.*)?$') &&
+               !url.matches('^https://(localhost|127\\.|10\\.|192\\.168\\.|169\\.254\\.|0\\.|172\\.(1[6-9]|2[0-9]|3[0-1])\\.).*')));
+    }
+
+    function isValidEarlyAccessPass(data) {
+      return data.planTier == 'pro' &&
+             data.subscriptionStatus == 'trialing' &&
+             data.monthlyCreditsLimit == 300 &&
+             data.subscriptionExpiresAt is timestamp &&
+             data.subscriptionExpiresAt > request.time &&
+             data.subscriptionExpiresAt <= request.time + duration.value(91, 'd');
+    }
+
+    function isValidFreeProfileState(data) {
+      return data.planTier == 'free' &&
+             data.subscriptionStatus in ['none', 'expired'] &&
+             data.monthlyCreditsLimit == 10 &&
+             (!('subscriptionExpiresAt' in data) || data.subscriptionExpiresAt == null);
+    }
+
+    function isValidUserProfile(data) {
+      return data.userId is string && data.userId == request.auth.uid && data.userId.size() <= 128 &&
+             (!('email' in data) || data.email == null || (data.email is string && data.email.size() <= 254)) &&
+             data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 100 &&
+             data.planTier is string && isValidPlanTier(data.planTier) &&
+             data.monthlyCreditsLimit is int && data.monthlyCreditsLimit >= 10 && data.monthlyCreditsLimit <= 100000 &&
+             data.monthlyCreditsUsed is int && data.monthlyCreditsUsed >= 0 && data.monthlyCreditsUsed <= 100000 &&
+             data.paygCredits is int && data.paygCredits >= 0 && data.paygCredits <= 100000 &&
+             data.preferredCurrency is string && isValidCurrency(data.preferredCurrency) &&
+             data.paymentProvider is string && isValidProvider(data.paymentProvider) &&
+             data.subscriptionStatus is string && isValidSubStatus(data.subscriptionStatus) &&
+             (!('subscriptionExpiresAt' in data) || data.subscriptionExpiresAt == null || data.subscriptionExpiresAt is timestamp) &&
+             data.zeroRetentionEnabled is bool &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidScanDocument(data) {
+      return data.userId is string && data.userId == request.auth.uid && data.userId.size() <= 128 &&
+             data.title is string && data.title.size() >= 1 && data.title.size() <= 120 &&
+             data.markdown is string && data.markdown.size() >= 1 && data.markdown.size() <= 100000 &&
+             data.mode is string && data.mode in ['fast', 'precision', 'table'] &&
+             data.preset is string && data.preset in ['layout', 'table', 'line_breaks', 'translate_en', 'clean_punctuation', 'code_math'] &&
+             data.pageCount is int && data.pageCount >= 1 && data.pageCount <= 50 &&
+             data.hasTable is bool &&
+             data.zeroRetention is bool &&
+             data.lowConfidenceTerms is list && data.lowConfidenceTerms.size() <= 30 &&
+             (data.lowConfidenceTerms.size() == 0 || data.lowConfidenceTerms[0] is string) &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidWorkflow(data) {
+      return data.userId is string && data.userId == request.auth.uid && data.userId.size() <= 128 &&
+             data.name is string && data.name.size() >= 1 && data.name.size() <= 80 &&
+             data.trigger is string && data.trigger in ['on_scan_complete', 'on_table_detected', 'on_manual_export'] &&
+             data.destinationType is string && data.destinationType in ['webhook_json', 'accounting_csv'] &&
+             isValidHttpsWebhookUrl(data.endpointUrl) &&
+             data.enabled is bool &&
+             data.lastStatus is string && data.lastStatus in ['idle', 'delivered', 'failed'] &&
+             (!('lastTriggeredAt' in data) || data.lastTriggeredAt == null || (data.lastTriggeredAt is timestamp && data.lastTriggeredAt <= request.time)) &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    match /users/{userId} {
+      allow get: if isOwner(userId) && isValidId(userId);
+      allow list: if isOwner(userId);
+
+      // Anti-privilege-escalation: clients can only initialize with 3-month Early Access Pro (<=91d) or Free,
+      // zero used/PAYG credits, and no forged payment provider.
+      allow create: if isOwner(userId) &&
+                       isValidId(userId) &&
+                       incoming().keys().hasAll([
+                         'userId', 'displayName', 'planTier', 'monthlyCreditsLimit',
+                         'monthlyCreditsUsed', 'paygCredits', 'preferredCurrency',
+                         'paymentProvider', 'subscriptionStatus', 'zeroRetentionEnabled',
+                         'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'userId', 'email', 'displayName', 'planTier', 'monthlyCreditsLimit',
+                         'monthlyCreditsUsed', 'paygCredits', 'preferredCurrency',
+                         'paymentProvider', 'subscriptionStatus', 'subscriptionExpiresAt',
+                         'zeroRetentionEnabled', 'createdAt', 'updatedAt'
+                       ]) &&
+                       isValidUserProfile(incoming()) &&
+                       incoming().monthlyCreditsUsed == 0 &&
+                       incoming().paygCredits == 0 &&
+                       incoming().paymentProvider == 'none' &&
+                       (isValidEarlyAccessPass(incoming()) ||
+                        (incoming().subscriptionStatus == 'none' && isValidFreeProfileState(incoming())));
+
+      // Anti-tampering update rules: clients cannot mint PAYG credits, reset credit usage,
+      // spoof 'active' paid status, escalate to plus/team, or extend trial expiry.
+      allow update: if isOwner(userId) &&
+                       isValidId(userId) &&
+                       isValidUserProfile(incoming()) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().paymentProvider == existing().paymentProvider &&
+                       incoming().subscriptionStatus != 'active' &&
+                       incoming().paygCredits <= existing().paygCredits &&
+                       incoming().diff(existing()).affectedKeys().hasOnly([
+                         'email', 'displayName', 'planTier', 'monthlyCreditsLimit',
+                         'monthlyCreditsUsed', 'paygCredits', 'preferredCurrency',
+                         'subscriptionStatus', 'subscriptionExpiresAt',
+                         'zeroRetentionEnabled', 'updatedAt'
+                       ]) &&
+                       (
+                         // Case 1: Normal usage / preferences without elevating plan, limit, or expiry
+                         (
+                           incoming().planTier == existing().planTier &&
+                           incoming().monthlyCreditsLimit == existing().monthlyCreditsLimit &&
+                           incoming().subscriptionStatus == existing().subscriptionStatus &&
+                           incoming().get('subscriptionExpiresAt', null) == existing().get('subscriptionExpiresAt', null) &&
+                           incoming().monthlyCreditsUsed >= existing().monthlyCreditsUsed
+                         ) ||
+                         // Case 2: One-time migration from legacy 'free'+'none' to 3-month Early Access Pro
+                         (
+                           existing().planTier == 'free' &&
+                           existing().subscriptionStatus == 'none' &&
+                           incoming().monthlyCreditsUsed == 0 &&
+                           isValidEarlyAccessPass(incoming())
+                         ) ||
+                         // Case 3: Automatic downgrade to Free when Early Access period expires
+                         (
+                           incoming().planTier == 'free' &&
+                           incoming().monthlyCreditsLimit == 10 &&
+                           incoming().subscriptionStatus == 'expired' &&
+                           (!('subscriptionExpiresAt' in incoming()) || incoming().subscriptionExpiresAt == null)
+                         )
+                       );
+
+      allow delete: if isOwner(userId) && isValidId(userId);
+
+      match /scans/{scanId} {
+        allow get: if isOwner(userId) && isValidId(scanId);
+        allow list: if isOwner(userId);
+
+        allow create: if isOwner(userId) &&
+                         isValidId(scanId) &&
+                         incoming().keys().hasAll([
+                           'userId', 'title', 'markdown', 'mode', 'preset',
+                           'pageCount', 'hasTable', 'zeroRetention',
+                           'lowConfidenceTerms', 'createdAt', 'updatedAt'
+                         ]) &&
+                         incoming().keys().hasOnly([
+                           'userId', 'title', 'markdown', 'mode', 'preset',
+                           'pageCount', 'hasTable', 'zeroRetention',
+                           'lowConfidenceTerms', 'createdAt', 'updatedAt'
+                         ]) &&
+                         isValidScanDocument(incoming());
+
+        allow update: if isOwner(userId) &&
+                         isValidId(scanId) &&
+                         isValidScanDocument(incoming()) &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         incoming().diff(existing()).affectedKeys().hasOnly([
+                           'title', 'markdown', 'mode', 'preset', 'pageCount',
+                           'hasTable', 'zeroRetention', 'lowConfidenceTerms', 'updatedAt'
+                         ]);
+
+        allow delete: if isOwner(userId) && isValidId(scanId);
+      }
+
+      // Billing payments are paused until merchant onboarding; deny all client-side order fabrication.
+      match /billing_orders/{orderId} {
+        allow get: if isOwner(userId) && isValidId(orderId);
+        allow list: if isOwner(userId);
+        allow create, update, delete: if false;
+      }
+
+      match /workflows/{workflowId} {
+        allow get: if isOwner(userId) && isValidId(workflowId);
+        allow list: if isOwner(userId);
+
+        allow create: if isOwner(userId) &&
+                         isValidId(workflowId) &&
+                         incoming().keys().hasAll([
+                           'userId', 'name', 'trigger', 'destinationType',
+                           'endpointUrl', 'enabled', 'lastStatus', 'createdAt', 'updatedAt'
+                         ]) &&
+                         incoming().keys().hasOnly([
+                           'userId', 'name', 'trigger', 'destinationType',
+                           'endpointUrl', 'enabled', 'lastStatus', 'lastTriggeredAt',
+                           'createdAt', 'updatedAt'
+                         ]) &&
+                         isValidWorkflow(incoming());
+
+        allow update: if isOwner(userId) &&
+                         isValidId(workflowId) &&
+                         isValidWorkflow(incoming()) &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         incoming().diff(existing()).affectedKeys().hasOnly([
+                           'name', 'trigger', 'destinationType', 'endpointUrl',
+                           'enabled', 'lastStatus', 'lastTriggeredAt', 'updatedAt'
+                         ]);
+
+        allow delete: if isOwner(userId) && isValidId(workflowId);
+      }
+    }
+  }
+}

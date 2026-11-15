@@ -1,0 +1,6 @@
+{
+  "name": "Lenscribe",
+  "description": "Precision document scanner, structured OCR editor, 7-format exporter, billing workspace, and studio image editor.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
