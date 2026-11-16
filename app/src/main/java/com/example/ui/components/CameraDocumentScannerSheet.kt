@@ -10,6 +10,17 @@ import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -208,6 +219,29 @@ fun CameraDocumentScannerDialog(
                 modifier = Modifier.fillMaxSize()
             )
 
+            val reticlePulse by rememberInfiniteTransition(label = "reticle_pulse").animateFloat(
+                initialValue = 0.62f,
+                targetValue = 1.0f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(durationMillis = 1100, easing = FastOutSlowInEasing),
+                    repeatMode = RepeatMode.Reverse
+                ),
+                label = "reticle_alpha"
+            )
+            val flashAlpha by animateFloatAsState(
+                targetValue = if (isCapturing) 0.35f else 0f,
+                animationSpec = tween(durationMillis = 160),
+                label = "shutter_flash"
+            )
+
+            if (flashAlpha > 0f) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.White.copy(alpha = flashAlpha))
+                )
+            }
+
             // Precision emerald document viewfinder corner reticle
             Canvas(modifier = Modifier.fillMaxSize()) {
                 val padX = size.width * 0.08f
@@ -216,19 +250,19 @@ fun CameraDocumentScannerDialog(
                 val bottom = size.height - padY
                 val bracket = size.minDimension * 0.08f
                 val stroke = 6f
+                val reticleColor = EmeraldMint.copy(alpha = reticlePulse)
 
-                // Dim outside framing guides
-                drawLine(EmeraldMint, Offset(padX, padY), Offset(padX + bracket, padY), stroke, StrokeCap.Round)
-                drawLine(EmeraldMint, Offset(padX, padY), Offset(padX, padY + bracket), stroke, StrokeCap.Round)
+                drawLine(reticleColor, Offset(padX, padY), Offset(padX + bracket, padY), stroke, StrokeCap.Round)
+                drawLine(reticleColor, Offset(padX, padY), Offset(padX, padY + bracket), stroke, StrokeCap.Round)
 
-                drawLine(EmeraldMint, Offset(right, padY), Offset(right - bracket, padY), stroke, StrokeCap.Round)
-                drawLine(EmeraldMint, Offset(right, padY), Offset(right, padY + bracket), stroke, StrokeCap.Round)
+                drawLine(reticleColor, Offset(right, padY), Offset(right - bracket, padY), stroke, StrokeCap.Round)
+                drawLine(reticleColor, Offset(right, padY), Offset(right, padY + bracket), stroke, StrokeCap.Round)
 
-                drawLine(EmeraldMint, Offset(padX, bottom), Offset(padX + bracket, bottom), stroke, StrokeCap.Round)
-                drawLine(EmeraldMint, Offset(padX, bottom), Offset(padX, bottom - bracket), stroke, StrokeCap.Round)
+                drawLine(reticleColor, Offset(padX, bottom), Offset(padX + bracket, bottom), stroke, StrokeCap.Round)
+                drawLine(reticleColor, Offset(padX, bottom), Offset(padX, bottom - bracket), stroke, StrokeCap.Round)
 
-                drawLine(EmeraldMint, Offset(right, bottom), Offset(right - bracket, bottom), stroke, StrokeCap.Round)
-                drawLine(EmeraldMint, Offset(right, bottom), Offset(right, bottom - bracket), stroke, StrokeCap.Round)
+                drawLine(reticleColor, Offset(right, bottom), Offset(right - bracket, bottom), stroke, StrokeCap.Round)
+                drawLine(reticleColor, Offset(right, bottom), Offset(right, bottom - bracket), stroke, StrokeCap.Round)
             }
 
             // Top Controls
@@ -253,16 +287,22 @@ fun CameraDocumentScannerDialog(
                 }
 
                 Surface(
-                    color = Color.Black.copy(alpha = 0.7f),
+                    color = Color.Black.copy(alpha = 0.72f),
                     shape = RoundedCornerShape(999.dp),
-                    border = BorderStroke(1.dp, EmeraldMint.copy(alpha = 0.5f))
+                    border = BorderStroke(1.dp, EmeraldMint.copy(alpha = 0.55f))
                 ) {
-                    Text(
-                        text = "Align page inside frame • ${capturedPages.size} snapped",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = Color.White,
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
-                    )
+                    AnimatedContent(
+                        targetState = capturedPages.size,
+                        transitionSpec = { fadeIn(tween(150)).togetherWith(fadeOut(tween(120))) },
+                        label = "snapped_count"
+                    ) { count ->
+                        Text(
+                            text = "Align page inside frame • $count snapped",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = Color.White,
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
+                        )
+                    }
                 }
 
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

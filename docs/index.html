@@ -7,13 +7,13 @@
   <meta name="description" content="Snap or upload receipts, handwritten notes, contracts, or whiteboards. Reorder pages and export cleanly to Word, Excel, PowerPoint, PDF, CSV, Markdown, or PNG cards." />
   <style>
     :root {
-      --bg: #070b0f;
-      --surface: #0e141b;
-      --surface-alt: #131c26;
-      --border: #1e2a38;
-      --text: #eef4f8;
-      --muted: #8fa3b8;
-      --primary: #2ce6b2;
+      --bg: #0a0c10;
+      --surface: #12151c;
+      --surface-alt: #1a1e28;
+      --border: #272c38;
+      --text: #f3f5f7;
+      --muted: #9aa3b2;
+      --primary: #2dd49f;
       --primary-dark: #07261e;
       --accent: #38bdf8;
       --radius: 14px;
@@ -22,23 +22,27 @@
     html { scroll-behavior: smooth; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif;
-      background:
-        radial-gradient(circle at 50% 0%, rgba(44, 230, 178, 0.14), transparent 52%),
+      background-color: var(--bg);
+      background-image:
         linear-gradient(to right, rgba(255,255,255,0.025) 1px, transparent 1px),
-        linear-gradient(to bottom, rgba(255,255,255,0.025) 1px, transparent 1px),
-        var(--bg);
-      background-size: 100% 100%, 44px 44px, 44px 44px, 100% 100%;
+        linear-gradient(to bottom, rgba(255,255,255,0.025) 1px, transparent 1px);
+      background-size: 44px 44px;
       color: var(--text);
       line-height: 1.6;
       -webkit-font-smoothing: antialiased;
     }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .hero, .preview-window { animation: fadeUp 0.45s cubic-bezier(0.22, 1, 0.36, 1) both; }
     a { color: inherit; text-decoration: none; }
     .container { max-width: 1080px; margin: 0 auto; padding: 0 20px; }
 
     header {
       position: sticky; top: 0; z-index: 20;
-      backdrop-filter: blur(12px);
-      background: rgba(7, 11, 15, 0.85);
+      backdrop-filter: blur(10px);
+      background: rgba(10, 12, 16, 0.92);
       border-bottom: 1px solid var(--border);
     }
     .nav {

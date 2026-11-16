@@ -2,6 +2,14 @@ package com.example.ui.screens
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -78,6 +86,7 @@ import com.example.model.PlanTier
 import com.example.model.UserProfile
 import com.example.model.WorkflowAutomation
 import com.example.security.SecurityGuard
+import com.example.ui.components.smoothCardSize
 import com.example.viewmodel.UiState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -195,20 +204,27 @@ fun BillingAndWorkflowsScreen(
 
             // Early Access Billing Schedule Banner (payments hidden until next year)
             Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.42f)),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.45f)),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
                     modifier = Modifier.padding(16.dp),
                     verticalAlignment = Alignment.Top
                 ) {
-                    Icon(
-                        imageVector = Icons.Filled.AutoAwesome,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(22.dp)
-                    )
+                    Surface(
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        shape = MaterialTheme.shapes.small
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.AutoAwesome,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier
+                                .padding(8.dp)
+                                .size(20.dp)
+                        )
+                    }
                     Spacer(modifier = Modifier.width(12.dp))
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(
@@ -618,8 +634,13 @@ private fun EarlyAccessStatusAndTimerCard(
 
             val limit = (profile?.monthlyCreditsLimit ?: 10L).coerceAtLeast(1L)
             val used = (profile?.monthlyCreditsUsed ?: 0L).coerceIn(0L, limit)
+            val quotaProgress by animateFloatAsState(
+                targetValue = ((limit - used).toFloat() / limit.toFloat()).coerceIn(0f, 1f),
+                animationSpec = tween(durationMillis = 360, easing = FastOutSlowInEasing),
+                label = "quota_progress"
+            )
             LinearProgressIndicator(
-                progress = { ((limit - used).toFloat() / limit.toFloat()).coerceIn(0f, 1f) },
+                progress = { quotaProgress },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(8.dp)
@@ -634,11 +655,16 @@ private fun EarlyAccessStatusAndTimerCard(
                 val minutes = (remMs / (60L * 1000L)) % 60L
                 val seconds = (remMs / 1000L) % 60L
                 val countdownStr = String.format(Locale.US, "%dd %02dh %02dm %02ds", days, hours, minutes, seconds)
+                val countdownProgress by animateFloatAsState(
+                    targetValue = (remMs.toFloat() / totalCycleMs.toFloat()).coerceIn(0f, 1f),
+                    animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
+                    label = "countdown_progress"
+                )
 
                 Surface(
-                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.45f),
+                    color = MaterialTheme.colorScheme.surfaceVariant,
                     shape = MaterialTheme.shapes.small,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.4f)),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("subscription_countdown_card")
@@ -674,7 +700,7 @@ private fun EarlyAccessStatusAndTimerCard(
                             )
                         }
                         LinearProgressIndicator(
-                            progress = { (remMs.toFloat() / totalCycleMs.toFloat()).coerceIn(0f, 1f) },
+                            progress = { countdownProgress },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(5.dp)
@@ -782,6 +808,7 @@ private fun LocalBackupDatabaseCard(
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
         modifier = Modifier
             .fillMaxWidth()
+            .smoothCardSize()
             .testTag("local_backup_database_card")
     ) {
         Column(
@@ -1051,6 +1078,7 @@ private fun AccountPrivacyAndDeletionCard(
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
         modifier = Modifier
             .fillMaxWidth()
+            .smoothCardSize()
             .testTag("privacy_and_deletion_card")
     ) {
         Column(
@@ -1087,9 +1115,13 @@ private fun AccountPrivacyAndDeletionCard(
                 Text(if (showPrivacySummary) "Hide Data Safety Details" else "View Data Safety Details")
             }
 
-            if (showPrivacySummary) {
+            AnimatedVisibility(
+                visible = showPrivacySummary,
+                enter = expandVertically(tween(220)) + fadeIn(tween(200)),
+                exit = shrinkVertically(tween(160)) + fadeOut(tween(140))
+            ) {
                 Surface(
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    color = MaterialTheme.colorScheme.surfaceVariant,
                     shape = MaterialTheme.shapes.small,
                     modifier = Modifier.fillMaxWidth()
                 ) {

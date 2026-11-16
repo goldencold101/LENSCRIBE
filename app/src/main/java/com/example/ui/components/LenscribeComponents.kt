@@ -6,11 +6,22 @@ import android.content.Context
 import android.graphics.Bitmap
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -101,12 +112,15 @@ fun CreditBalancePill(
 ) {
     val credits = profile?.totalRemainingCredits ?: 0L
     val planName = profile?.tier?.displayName ?: "Free"
+    val interactionSource = remember { MutableInteractionSource() }
     Surface(
         onClick = onClick,
+        interactionSource = interactionSource,
         shape = RoundedCornerShape(999.dp),
-        color = MaterialTheme.colorScheme.primaryContainer,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.45f)),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)),
         modifier = modifier
+            .pressScale(interactionSource)
             .defaultMinSize(minHeight = 36.dp)
             .testTag("credit_balance_pill")
     ) {
@@ -121,13 +135,19 @@ fun CreditBalancePill(
                     .background(MaterialTheme.colorScheme.primary)
             )
             Spacer(modifier = Modifier.width(6.dp))
-            Text(
-                text = "$planName • $credits cr",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1
-            )
+            AnimatedContent(
+                targetState = "$planName • $credits cr",
+                transitionSpec = { fadeIn(tween(180)).togetherWith(fadeOut(tween(140))) },
+                label = "credit_pill_text"
+            ) { pillText ->
+                Text(
+                    text = pillText,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1
+                )
+            }
         }
     }
 }
@@ -388,6 +408,23 @@ fun ExportDocumentBottomSheet(
                         pair.forEach { fmt ->
                             val unlocked = fmt.freeTierAllowed || allowsAllExports
                             val selected = selectedFormat == fmt
+                            val tileColor by animateColorAsState(
+                                targetValue = if (selected) MaterialTheme.colorScheme.primaryContainer
+                                else MaterialTheme.colorScheme.surfaceVariant,
+                                animationSpec = tween(180),
+                                label = "export_tile_color_${fmt.ext}"
+                            )
+                            val tileBorderColor by animateColorAsState(
+                                targetValue = if (selected) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.outline,
+                                animationSpec = tween(180),
+                                label = "export_tile_border_${fmt.ext}"
+                            )
+                            val tileBorderWidth by animateDpAsState(
+                                targetValue = if (selected) 1.5.dp else 1.dp,
+                                animationSpec = tween(180),
+                                label = "export_tile_width_${fmt.ext}"
+                            )
                             Surface(
                                 onClick = {
                                     if (unlocked) {
@@ -398,12 +435,8 @@ fun ExportDocumentBottomSheet(
                                     }
                                 },
                                 shape = MaterialTheme.shapes.medium,
-                                color = if (selected) MaterialTheme.colorScheme.primaryContainer
-                                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                                border = BorderStroke(
-                                    1.dp,
-                                    if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
-                                ),
+                                color = tileColor,
+                                border = BorderStroke(tileBorderWidth, tileBorderColor),
                                 modifier = Modifier
                                     .weight(1f)
                                     .defaultMinSize(minHeight = 52.dp)
@@ -450,44 +483,50 @@ fun ExportDocumentBottomSheet(
                 }
             }
 
-            if (selectedFormat == ExportFormat.PNG_CARD) {
-                Text(
-                    text = "Share Card Theme & Aspect",
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    CardTheme.entries.forEach { theme ->
-                        FilterChip(
-                            selected = cardTheme == theme,
-                            onClick = { cardTheme = theme },
-                            label = { Text(theme.label) }
-                        )
-                    }
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    CardAspect.entries.forEach { aspect ->
-                        FilterChip(
-                            selected = cardAspect == aspect,
-                            onClick = { cardAspect = aspect },
-                            label = { Text(aspect.label) }
-                        )
-                    }
-                }
-                if (cardPreviewBitmap != null) {
-                    val ratio = cardAspect.width.toFloat() / cardAspect.height.toFloat()
-                    Image(
-                        bitmap = cardPreviewBitmap.asImageBitmap(),
-                        contentDescription = "Share card preview",
-                        contentScale = ContentScale.Fit,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(210.dp)
-                            .clip(MaterialTheme.shapes.medium)
-                            .border(1.dp, MaterialTheme.colorScheme.outline, MaterialTheme.shapes.medium)
-                            .aspectRatio(ratio, matchHeightConstraintsFirst = true)
-                            .align(Alignment.CenterHorizontally)
+            AnimatedVisibility(
+                visible = selectedFormat == ExportFormat.PNG_CARD,
+                enter = expandVertically(tween(220)) + fadeIn(tween(200)),
+                exit = shrinkVertically(tween(160)) + fadeOut(tween(140))
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = "Share Card Theme & Aspect",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        CardTheme.entries.forEach { theme ->
+                            FilterChip(
+                                selected = cardTheme == theme,
+                                onClick = { cardTheme = theme },
+                                label = { Text(theme.label) }
+                            )
+                        }
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        CardAspect.entries.forEach { aspect ->
+                            FilterChip(
+                                selected = cardAspect == aspect,
+                                onClick = { cardAspect = aspect },
+                                label = { Text(aspect.label) }
+                            )
+                        }
+                    }
+                    if (cardPreviewBitmap != null) {
+                        val ratio = cardAspect.width.toFloat() / cardAspect.height.toFloat()
+                        Image(
+                            bitmap = cardPreviewBitmap.asImageBitmap(),
+                            contentDescription = "Share card preview",
+                            contentScale = ContentScale.Fit,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(210.dp)
+                                .clip(MaterialTheme.shapes.medium)
+                                .border(1.dp, MaterialTheme.colorScheme.outline, MaterialTheme.shapes.medium)
+                                .aspectRatio(ratio, matchHeightConstraintsFirst = true)
+                                .align(Alignment.CenterHorizontally)
+                        )
+                    }
                 }
             }
 

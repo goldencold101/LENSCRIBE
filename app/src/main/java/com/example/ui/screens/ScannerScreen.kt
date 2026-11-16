@@ -6,13 +6,27 @@ import android.graphics.Bitmap
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -84,6 +98,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -103,8 +118,11 @@ import com.example.ui.components.CameraDocumentScannerDialog
 import com.example.ui.components.CreditBalancePill
 import com.example.ui.components.ExportDocumentBottomSheet
 import com.example.ui.components.MiniSpreadsheetEditor
+import com.example.ui.components.ScanningLaserOverlay
 import com.example.ui.components.ZeroRetentionBanner
 import com.example.ui.components.copyToClipboard
+import com.example.ui.components.pressScale
+import com.example.ui.components.smoothCardSize
 import com.example.viewmodel.ScanRunState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -407,7 +425,11 @@ fun ScannerScreen(
                         onRunScan = onRunScan
                     )
 
-                    if (editorMarkdown.isNotBlank()) {
+                    AnimatedVisibility(
+                        visible = editorMarkdown.isNotBlank(),
+                        enter = expandVertically(tween(240)) + fadeIn(tween(220)),
+                        exit = shrinkVertically(tween(180)) + fadeOut(tween(150))
+                    ) {
                         ResultWorkspacePane(
                             selectedBitmap = queuedPages.getOrNull(selectedPageIndex),
                             editorTitle = editorTitle,
@@ -449,11 +471,15 @@ private fun ScanProgressTimerBanner(
     val elapsedSeconds = ((nowMs - processing.startedAtMs).coerceAtLeast(0L) / 1000.0)
     val estTotal = processing.estimatedSeconds.coerceAtLeast(1)
     val remainingSec = (estTotal - elapsedSeconds.toInt()).coerceAtLeast(0)
-    val progress = (elapsedSeconds.toFloat() / estTotal.toFloat()).coerceIn(0.05f, 0.96f)
+    val progress by animateFloatAsState(
+        targetValue = (elapsedSeconds.toFloat() / estTotal.toFloat()).coerceIn(0.05f, 0.96f),
+        animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing),
+        label = "scan_timer_progress"
+    )
     val elapsedFormatted = String.format(java.util.Locale.US, "%.1fs", elapsedSeconds)
 
     Surface(
-        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+        color = MaterialTheme.colorScheme.primaryContainer,
         shape = MaterialTheme.shapes.medium,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.45f)),
         modifier = Modifier
@@ -539,7 +565,8 @@ private fun CaptureAndConfigPane(
         // Capture Source Card
         Card(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+            modifier = Modifier.smoothCardSize()
         ) {
             Column(
                 modifier = Modifier.padding(14.dp),
@@ -599,9 +626,9 @@ private fun CaptureAndConfigPane(
 
                 if (queuedPages.isEmpty()) {
                     Surface(
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                        color = MaterialTheme.colorScheme.surfaceVariant,
                         shape = MaterialTheme.shapes.medium,
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.6f)),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column(
@@ -649,13 +676,42 @@ private fun CaptureAndConfigPane(
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         itemsIndexed(queuedPages) { index, bmp ->
                             val selected = index == selectedPageIndex
+                            val thumbScale by animateFloatAsState(
+                                targetValue = if (selected) 1.0f else 0.94f,
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                                    stiffness = Spring.StiffnessMedium
+                                ),
+                                label = "thumb_scale_$index"
+                            )
+                            val borderWidth by animateDpAsState(
+                                targetValue = if (selected) 2.dp else 1.dp,
+                                animationSpec = tween(160),
+                                label = "thumb_border_$index"
+                            )
+                            val borderColor by animateColorAsState(
+                                targetValue = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                                animationSpec = tween(160),
+                                label = "thumb_border_color_$index"
+                            )
+                            val badgeBg by animateColorAsState(
+                                targetValue = if (selected) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.surface,
+                                animationSpec = tween(160),
+                                label = "thumb_badge_bg_$index"
+                            )
                             Box(
                                 modifier = Modifier
+                                    .animateItem()
+                                    .graphicsLayer {
+                                        scaleX = thumbScale
+                                        scaleY = thumbScale
+                                    }
                                     .size(72.dp)
                                     .clip(MaterialTheme.shapes.small)
                                     .border(
-                                        width = if (selected) 2.dp else 1.dp,
-                                        color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                                        width = borderWidth,
+                                        color = borderColor,
                                         shape = MaterialTheme.shapes.small
                                     )
                                     .clickable { onSelectPage(index) }
@@ -667,8 +723,7 @@ private fun CaptureAndConfigPane(
                                     modifier = Modifier.fillMaxSize()
                                 )
                                 Surface(
-                                    color = if (selected) MaterialTheme.colorScheme.primary
-                                    else MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
+                                    color = badgeBg,
                                     shape = MaterialTheme.shapes.extraSmall,
                                     modifier = Modifier
                                         .align(Alignment.TopStart)
@@ -684,7 +739,7 @@ private fun CaptureAndConfigPane(
                                     )
                                 }
                                 Surface(
-                                    color = MaterialTheme.colorScheme.background.copy(alpha = 0.8f),
+                                    color = MaterialTheme.colorScheme.background.copy(alpha = 0.85f),
                                     shape = CircleShape,
                                     modifier = Modifier
                                         .align(Alignment.TopEnd)
@@ -703,11 +758,15 @@ private fun CaptureAndConfigPane(
                         }
                     }
 
-                    if (queuedPages.size > 1) {
+                    AnimatedVisibility(
+                        visible = queuedPages.size > 1,
+                        enter = expandVertically(tween(200)) + fadeIn(tween(180)),
+                        exit = shrinkVertically(tween(160)) + fadeOut(tween(140))
+                    ) {
                         Surface(
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                            color = MaterialTheme.colorScheme.surfaceVariant,
                             shape = MaterialTheme.shapes.small,
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.45f)),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .testTag("page_sequence_bar")
@@ -779,16 +838,30 @@ private fun CaptureAndConfigPane(
 
                     val activeBitmap = queuedPages.getOrNull(selectedPageIndex)
                     if (activeBitmap != null) {
-                        Image(
-                            bitmap = activeBitmap.asImageBitmap(),
-                            contentDescription = "Selected page preview",
-                            contentScale = ContentScale.Fit,
+                        Box(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(200.dp)
                                 .clip(MaterialTheme.shapes.medium)
-                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
-                        )
+                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.medium)
+                        ) {
+                            AnimatedContent(
+                                targetState = activeBitmap,
+                                transitionSpec = { fadeIn(tween(180)).togetherWith(fadeOut(tween(140))) },
+                                label = "active_page_preview"
+                            ) { bmp ->
+                                Image(
+                                    bitmap = bmp.asImageBitmap(),
+                                    contentDescription = "Selected page preview",
+                                    contentScale = ContentScale.Fit,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            }
+                            if (scanRunState is ScanRunState.Processing) {
+                                ScanningLaserOverlay()
+                            }
+                        }
 
                         Row(
                             modifier = Modifier
@@ -837,7 +910,8 @@ private fun CaptureAndConfigPane(
         // Outcome Mode & Presets Card
         Card(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+            modifier = Modifier.smoothCardSize()
         ) {
             Column(
                 modifier = Modifier.padding(14.dp),
@@ -855,17 +929,33 @@ private fun CaptureAndConfigPane(
                 ) {
                     ScanMode.entries.forEach { mode ->
                         val selected = mode == scanMode
+                        val modeInteraction = remember { MutableInteractionSource() }
+                        val cardBg by animateColorAsState(
+                            targetValue = if (selected) MaterialTheme.colorScheme.primaryContainer
+                            else MaterialTheme.colorScheme.surfaceVariant,
+                            animationSpec = tween(180),
+                            label = "mode_bg_${mode.id}"
+                        )
+                        val cardBorder by animateColorAsState(
+                            targetValue = if (selected) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.outline,
+                            animationSpec = tween(180),
+                            label = "mode_border_${mode.id}"
+                        )
+                        val borderW by animateDpAsState(
+                            targetValue = if (selected) 1.5.dp else 1.dp,
+                            animationSpec = tween(180),
+                            label = "mode_border_w_${mode.id}"
+                        )
                         Surface(
                             onClick = { onSelectMode(mode) },
+                            interactionSource = modeInteraction,
                             shape = MaterialTheme.shapes.medium,
-                            color = if (selected) MaterialTheme.colorScheme.primaryContainer
-                            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                            border = BorderStroke(
-                                1.dp,
-                                if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
-                            ),
+                            color = cardBg,
+                            border = BorderStroke(borderW, cardBorder),
                             modifier = Modifier
                                 .weight(1f)
+                                .pressScale(modeInteraction)
                                 .defaultMinSize(minHeight = 68.dp)
                                 .testTag("scan_mode_${mode.id}")
                         ) {
@@ -1042,7 +1132,9 @@ private fun ResultWorkspacePane(
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-        modifier = modifier.fillMaxWidth()
+        modifier = modifier
+            .fillMaxWidth()
+            .smoothCardSize()
     ) {
         Column(
             modifier = Modifier.padding(14.dp),
@@ -1116,91 +1208,99 @@ private fun ResultWorkspacePane(
                     }
                 }
 
-                when (activeTab) {
-                    0 -> {
-                        if (lowConfidenceTerms.isNotEmpty()) {
-                            Surface(
-                                color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.14f),
-                                shape = MaterialTheme.shapes.small,
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text(
-                                    text = "Click-to-Verify: ${lowConfidenceTerms.size} faint/handwritten term(s) highlighted in amber.",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.tertiary,
-                                    modifier = Modifier.padding(10.dp)
+                AnimatedContent(
+                    targetState = activeTab,
+                    transitionSpec = { fadeIn(tween(180)).togetherWith(fadeOut(tween(130))) },
+                    label = "result_tab_content"
+                ) { tabIdx ->
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        when (tabIdx) {
+                            0 -> {
+                                if (lowConfidenceTerms.isNotEmpty()) {
+                                    Surface(
+                                        color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.14f),
+                                        shape = MaterialTheme.shapes.small,
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text(
+                                            text = "Click-to-Verify: ${lowConfidenceTerms.size} faint/handwritten term(s) highlighted in amber.",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.tertiary,
+                                            modifier = Modifier.padding(10.dp)
+                                        )
+                                    }
+                                }
+                                if (selectedBitmap != null) {
+                                    Image(
+                                        bitmap = selectedBitmap.asImageBitmap(),
+                                        contentDescription = "Original scan reference",
+                                        contentScale = ContentScale.Fit,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(170.dp)
+                                            .clip(MaterialTheme.shapes.small)
+                                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                                    )
+                                }
+                                Surface(
+                                    color = MaterialTheme.colorScheme.surfaceVariant,
+                                    shape = MaterialTheme.shapes.medium,
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    AnnotatedVerificationText(
+                                        markdown = editorMarkdown,
+                                        lowConfidenceTerms = lowConfidenceTerms,
+                                        modifier = Modifier.padding(14.dp)
+                                    )
+                                }
+                            }
+                            1 -> {
+                                OutlinedTextField(
+                                    value = editorTitle,
+                                    onValueChange = { onEditorChanged(it, editorMarkdown) },
+                                    label = { Text("Document Title") },
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                                OutlinedTextField(
+                                    value = editorMarkdown,
+                                    onValueChange = { onEditorChanged(editorTitle, it) },
+                                    label = { Text("Markdown Content") },
+                                    minLines = 8,
+                                    maxLines = 18,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .testTag("markdown_editor_input")
+                                )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.End
+                                ) {
+                                    TextButton(
+                                        onClick = {
+                                            val cleaned = editorMarkdown
+                                                .lines()
+                                                .joinToString("\n") { it.trimEnd() }
+                                                .replace(Regex("\n{3,}"), "\n\n")
+                                                .trim()
+                                            onEditorChanged(editorTitle, cleaned)
+                                        }
+                                    ) {
+                                        Icon(Icons.Filled.CleaningServices, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Clean Spacing")
+                                    }
+                                }
+                            }
+                            else -> {
+                                MiniSpreadsheetEditor(
+                                    markdown = editorMarkdown,
+                                    onCellChanged = onTableCellChanged,
+                                    onAddRow = onAddTableRow
                                 )
                             }
                         }
-                        if (selectedBitmap != null) {
-                            Image(
-                                bitmap = selectedBitmap.asImageBitmap(),
-                                contentDescription = "Original scan reference",
-                                contentScale = ContentScale.Fit,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(170.dp)
-                                    .clip(MaterialTheme.shapes.small)
-                                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
-                            )
-                        }
-                        Surface(
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-                            shape = MaterialTheme.shapes.medium,
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            AnnotatedVerificationText(
-                                markdown = editorMarkdown,
-                                lowConfidenceTerms = lowConfidenceTerms,
-                                modifier = Modifier.padding(14.dp)
-                            )
-                        }
-                    }
-                    1 -> {
-                        OutlinedTextField(
-                            value = editorTitle,
-                            onValueChange = { onEditorChanged(it, editorMarkdown) },
-                            label = { Text("Document Title") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        OutlinedTextField(
-                            value = editorMarkdown,
-                            onValueChange = { onEditorChanged(editorTitle, it) },
-                            label = { Text("Markdown Content") },
-                            minLines = 8,
-                            maxLines = 18,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("markdown_editor_input")
-                        )
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.End
-                        ) {
-                            TextButton(
-                                onClick = {
-                                    val cleaned = editorMarkdown
-                                        .lines()
-                                        .joinToString("\n") { it.trimEnd() }
-                                        .replace(Regex("\n{3,}"), "\n\n")
-                                        .trim()
-                                    onEditorChanged(editorTitle, cleaned)
-                                }
-                            ) {
-                                Icon(Icons.Filled.CleaningServices, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("Clean Spacing")
-                            }
-                        }
-                    }
-                    else -> {
-                        MiniSpreadsheetEditor(
-                            markdown = editorMarkdown,
-                            onCellChanged = onTableCellChanged,
-                            onAddRow = onAddTableRow
-                        )
                     }
                 }
 

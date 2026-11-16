@@ -1,10 +1,19 @@
 package com.example.ui.screens
 
 import android.graphics.BitmapFactory
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -65,6 +74,8 @@ import com.example.model.ScanDocument
 import com.example.model.UserProfile
 import com.example.ui.components.ExportDocumentBottomSheet
 import com.example.ui.components.ZeroRetentionBanner
+import com.example.ui.components.pressScale
+import com.example.ui.components.smoothCardSize
 import com.example.viewmodel.UiState
 import com.google.firebase.Timestamp
 import kotlinx.coroutines.Dispatchers
@@ -160,91 +171,112 @@ fun HistoryScreen(
                 }
             }
 
-            if (historySource == 0) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    listOf("All Scans", "Tables & Receipts", "Multi-Page").forEachIndexed { idx, label ->
-                        FilterChip(
-                            selected = filterMode == idx,
-                            onClick = { filterMode = idx },
-                            label = { Text(label) }
+            AnimatedContent(
+                targetState = historySource,
+                transitionSpec = {
+                    val forward = targetState >= initialState
+                    (slideInHorizontally(tween(220, easing = FastOutSlowInEasing)) { w -> if (forward) w / 12 else -w / 12 } +
+                        fadeIn(tween(200)))
+                        .togetherWith(
+                            slideOutHorizontally(tween(160, easing = FastOutSlowInEasing)) { w -> if (forward) -w / 14 else w / 14 } +
+                                fadeOut(tween(150))
                         )
-                    }
-                }
-            }
-
-            if (historySource == 1) {
-                val q = searchQuery.trim()
-                val filteredLocal = remember(localHistoryScans, q) {
-                    if (q.isEmpty()) localHistoryScans
-                    else localHistoryScans.filter {
-                        it.title.contains(q, ignoreCase = true) ||
-                            it.rawText.contains(q, ignoreCase = true)
-                    }
-                }
-
-                if (filteredLocal.isEmpty()) {
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(24.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                },
+                label = "history_source_transition",
+                modifier = Modifier.weight(1f)
+            ) { source ->
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    if (source == 0) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Filled.PhoneAndroid,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(32.dp)
-                            )
-                            Text(
-                                text = if (q.isEmpty()) "No local Room scans yet" else "No matching local scans",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = "Completed scans store title, raw text, timestamp, and a local preview image path in Room SQLite.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            listOf("All Scans", "Tables & Receipts", "Multi-Page").forEachIndexed { idx, label ->
+                                FilterChip(
+                                    selected = filterMode == idx,
+                                    onClick = { filterMode = idx },
+                                    label = { Text(label) }
+                                )
+                            }
                         }
                     }
-                } else {
-                    LazyColumn(
-                        contentPadding = PaddingValues(bottom = 24.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        items(filteredLocal, key = { it.id }) { localDoc ->
-                            LocalHistoryCard(
-                                doc = localDoc,
-                                dateFmt = dateFmt,
-                                onOpen = { onOpenLocalScan(localDoc) },
-                                onExport = {
-                                    exportTarget = ScanDocument(
-                                        id = localDoc.cloudScanId,
-                                        userId = localDoc.userId,
-                                        title = localDoc.title,
-                                        markdown = localDoc.rawText
+
+                    if (source == 1) {
+                        val q = searchQuery.trim()
+                        val filteredLocal = remember(localHistoryScans, q) {
+                            if (q.isEmpty()) localHistoryScans
+                            else localHistoryScans.filter {
+                                it.title.contains(q, ignoreCase = true) ||
+                                    it.rawText.contains(q, ignoreCase = true)
+                            }
+                        }
+
+                        if (filteredLocal.isEmpty()) {
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .smoothCardSize()
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(24.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.PhoneAndroid,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(32.dp)
                                     )
-                                },
-                                onDelete = { onDeleteLocalScan(localDoc) }
-                            )
+                                    Text(
+                                        text = if (q.isEmpty()) "No local Room scans yet" else "No matching local scans",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = "Completed scans store title, raw text, timestamp, and a local preview image path in Room SQLite.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        } else {
+                            LazyColumn(
+                                contentPadding = PaddingValues(bottom = 24.dp),
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                items(filteredLocal, key = { it.id }) { localDoc ->
+                                    LocalHistoryCard(
+                                        doc = localDoc,
+                                        dateFmt = dateFmt,
+                                        onOpen = { onOpenLocalScan(localDoc) },
+                                        onExport = {
+                                            exportTarget = ScanDocument(
+                                                id = localDoc.cloudScanId,
+                                                userId = localDoc.userId,
+                                                title = localDoc.title,
+                                                markdown = localDoc.rawText
+                                            )
+                                        },
+                                        onDelete = { onDeleteLocalScan(localDoc) },
+                                        modifier = Modifier.animateItem()
+                                    )
+                                }
+                            }
                         }
-                    }
-                }
-            } else when (scansState) {
-                is UiState.Loading -> {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator()
-                    }
-                }
+                    } else when (scansState) {
+                        is UiState.Loading -> {
+                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                CircularProgressIndicator()
+                            }
+                        }
                 is UiState.Error -> {
                     Surface(
                         color = MaterialTheme.colorScheme.errorContainer,
@@ -313,11 +345,15 @@ fun HistoryScreen(
                         ) {
                             items(filtered, key = { it.id }) { scan ->
                                 val stamp = scan.updatedAt ?: scan.createdAt ?: Timestamp.now()
+                                val cardInteraction = remember { MutableInteractionSource() }
                                 Card(
                                     onClick = { onOpenScan(scan) },
+                                    interactionSource = cardInteraction,
                                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                                     modifier = Modifier
+                                        .animateItem()
+                                        .pressScale(cardInteraction)
                                         .fillMaxWidth()
                                         .testTag("history_item_${scan.id}")
                                 ) {
@@ -394,6 +430,8 @@ fun HistoryScreen(
                     }
                 }
             }
+                }
+            }
         }
     }
 }
@@ -435,7 +473,8 @@ private fun LocalHistoryCard(
     dateFmt: SimpleDateFormat,
     onOpen: () -> Unit,
     onExport: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val thumbnail by produceState<android.graphics.Bitmap?>(initialValue = null, doc.capturedImagePath) {
         value = withContext(Dispatchers.IO) {
@@ -446,12 +485,15 @@ private fun LocalHistoryCard(
             runCatching { BitmapFactory.decodeFile(file.absolutePath, opts) }.getOrNull()
         }
     }
+    val interactionSource = remember { MutableInteractionSource() }
 
     Card(
         onClick = onOpen,
+        interactionSource = interactionSource,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-        modifier = Modifier
+        modifier = modifier
+            .pressScale(interactionSource)
             .fillMaxWidth()
             .testTag("local_history_item_${doc.id}")
     ) {

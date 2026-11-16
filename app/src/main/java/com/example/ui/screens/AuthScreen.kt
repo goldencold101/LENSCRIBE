@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -39,9 +40,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -56,6 +54,8 @@ import androidx.credentials.CredentialManager
 import com.example.R
 import com.example.auth.GoogleSignInButton
 import com.example.auth.attemptAutoSignIn
+import com.example.ui.components.EntranceReveal
+import com.example.ui.components.smoothCardSize
 
 @Composable
 fun AuthScreen(
@@ -79,17 +79,10 @@ fun AuthScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    listOf(
-                        MaterialTheme.colorScheme.background,
-                        Color(0xFF071312),
-                        MaterialTheme.colorScheme.background
-                    )
-                )
-            )
+            .background(MaterialTheme.colorScheme.background)
             .statusBarsPadding()
-            .padding(20.dp),
+            .navigationBarsPadding()
+            .padding(horizontal = 20.dp, vertical = 16.dp),
         contentAlignment = Alignment.Center
     ) {
         Column(
@@ -100,98 +93,150 @@ fun AuthScreen(
             verticalArrangement = Arrangement.spacedBy(18.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Top Brand Row
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
-            ) {
+            EntranceReveal(initialOffsetY = 12) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.45f))
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.DocumentScanner,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier
+                                    .padding(10.dp)
+                                    .size(22.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                text = stringResource(R.string.app_name),
+                                style = MaterialTheme.typography.titleLarge,
+                                color = MaterialTheme.colorScheme.onBackground,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "PRECISION DOCUMENT WORKSPACE",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+
+                    Surface(
+                        shape = MaterialTheme.shapes.small,
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+                    ) {
+                        Text(
+                            text = "3 MO FREE PRO",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
+                        )
+                    }
+                }
+            }
+
+            EntranceReveal(initialOffsetY = 18) {
                 Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
+                    shape = MaterialTheme.shapes.large,
+                    color = MaterialTheme.colorScheme.surface,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Icon(
-                        imageVector = Icons.Filled.DocumentScanner,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier
-                            .padding(10.dp)
-                            .size(24.dp)
-                    )
-                }
-                Spacer(modifier = Modifier.width(12.dp))
-                Column {
-                    Text(
-                        text = stringResource(R.string.app_name),
-                        style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onBackground,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "PRECISION DOCUMENT WORKSPACE",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary
-                    )
+                    Box {
+                        Image(
+                            painter = painterResource(id = R.drawable.img_hero_scanner),
+                            contentDescription = "Lenscribe precision document scanning illustration",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(160.dp)
+                        )
+                        Surface(
+                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+                            shape = MaterialTheme.shapes.small,
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                            modifier = Modifier
+                                .align(Alignment.BottomStart)
+                                .padding(10.dp)
+                        ) {
+                            Text(
+                                text = "OCR • TABLES • 7 EXPORT FORMATS",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
                 }
             }
 
-            // Hero Card
-            Image(
-                painter = painterResource(id = R.drawable.img_hero_scanner),
-                contentDescription = "Lenscribe precision document scanning illustration",
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(175.dp)
-                    .clip(MaterialTheme.shapes.large)
-            )
-
-            // Headline
-            val headline = buildAnnotatedString {
-                append("Paper to ")
-                withStyle(SpanStyle(color = MaterialTheme.colorScheme.primary)) {
-                    append("editable text")
-                }
-                append(", in seconds.")
-            }
-            Text(
-                text = headline,
-                style = MaterialTheme.typography.headlineLarge,
-                color = MaterialTheme.colorScheme.onBackground,
-                modifier = Modifier.fillMaxWidth()
-            )
-            Text(
-                text = stringResource(R.string.tagline_subtitle),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            // Feature highlights
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-                modifier = Modifier.fillMaxWidth()
-            ) {
+            EntranceReveal(initialOffsetY = 22) {
                 Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    FeatureRow(
-                        icon = Icons.Filled.Layers,
-                        title = "Multi-Page Sequencing & Click-to-Verify",
-                        subtitle = "Reorder pages (#1, #2...), auto-contrast, and inspect flagged numbers"
+                    val headline = buildAnnotatedString {
+                        append("Paper to ")
+                        withStyle(SpanStyle(color = MaterialTheme.colorScheme.primary)) {
+                            append("editable text")
+                        }
+                        append(", in seconds.")
+                    }
+                    Text(
+                        text = headline,
+                        style = MaterialTheme.typography.displaySmall,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        modifier = Modifier.fillMaxWidth()
                     )
-                    FeatureRow(
-                        icon = Icons.Filled.TableView,
-                        title = "Word, Excel, PowerPoint, PDF, CSV & Cards",
-                        subtitle = "Built-in editable spreadsheet grid with instant 7-format export"
+                    Text(
+                        text = stringResource(R.string.tagline_subtitle),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.fillMaxWidth()
                     )
-                    FeatureRow(
-                        icon = Icons.Filled.Shield,
-                        title = "3 Months Free Pro + SQLite Backup DB",
-                        subtitle = "Cloud sync, offline SQLite failover backup, and portable .json restore"
-                    )
+                }
+            }
+
+            EntranceReveal(initialOffsetY = 26) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .smoothCardSize()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        FeatureRow(
+                            icon = Icons.Filled.Layers,
+                            title = "Multi-Page Sequencing & Click-to-Verify",
+                            subtitle = "Reorder pages (#1, #2...), auto-contrast, and inspect flagged numbers"
+                        )
+                        FeatureRow(
+                            icon = Icons.Filled.TableView,
+                            title = "Word, Excel, PowerPoint, PDF, CSV & Cards",
+                            subtitle = "Built-in editable spreadsheet grid with instant 7-format export"
+                        )
+                        FeatureRow(
+                            icon = Icons.Filled.Shield,
+                            title = "3 Months Free Pro + SQLite Backup DB",
+                            subtitle = "Cloud sync, offline SQLite failover backup, and portable .json restore"
+                        )
+                    }
                 }
             }
 
@@ -210,19 +255,26 @@ fun AuthScreen(
                 }
             }
 
-            GoogleSignInButton(
-                onAuthSuccess = {
-                    errorMessage = null
-                    onAuthSuccess()
-                },
-                onAuthError = { msg -> errorMessage = msg }
-            )
-
-            Text(
-                text = "Sign in with Google to sync scan credits, billing orders, and library documents.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            EntranceReveal(initialOffsetY = 28) {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    GoogleSignInButton(
+                        onAuthSuccess = {
+                            errorMessage = null
+                            onAuthSuccess()
+                        },
+                        onAuthError = { msg -> errorMessage = msg }
+                    )
+                    Text(
+                        text = "Sign in with Google to sync scan credits, billing orders, and library documents.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
         }
     }
 }
@@ -234,14 +286,20 @@ private fun FeatureRow(
     subtitle: String
 ) {
     Row(verticalAlignment = Alignment.Top) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.secondary,
-            modifier = Modifier
-                .padding(top = 2.dp)
-                .size(20.dp)
-        )
+        Surface(
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            shape = MaterialTheme.shapes.small,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier
+                    .padding(7.dp)
+                    .size(18.dp)
+            )
+        }
         Spacer(modifier = Modifier.width(12.dp))
         Column {
             Text(

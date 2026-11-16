@@ -6,8 +6,21 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -24,16 +37,20 @@ import androidx.compose.material.icons.outlined.Brush
 import androidx.compose.material.icons.outlined.CreditCard
 import androidx.compose.material.icons.outlined.DocumentScanner
 import androidx.compose.material.icons.outlined.FolderCopy
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
+import androidx.compose.material3.NavigationRailItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -44,6 +61,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -132,19 +150,28 @@ fun AppNavigation(
     val currentUser by auth.authStateFlow().collectAsStateWithLifecycle(initialValue = auth.currentUser)
     val user = currentUser
 
-    if (user == null) {
-        AuthScreen(onAuthSuccess = {})
-    } else {
-        key(user.uid) {
-            LenscribeWorkspace(
-                currentUserId = user.uid,
-                displayName = user.displayName ?: "Workspace User",
-                email = user.email,
-                isDarkTheme = isDarkTheme,
-                screenShieldEnabled = screenShieldEnabled,
-                onToggleTheme = onToggleTheme,
-                onToggleScreenShield = onToggleScreenShield
-            )
+    AnimatedContent(
+        targetState = user?.uid,
+        transitionSpec = {
+            (fadeIn(tween(240)) + scaleIn(initialScale = 0.985f, animationSpec = tween(240)))
+                .togetherWith(fadeOut(tween(180)))
+        },
+        label = "auth_workspace_transition"
+    ) { uid ->
+        if (uid == null || user == null) {
+            AuthScreen(onAuthSuccess = {})
+        } else {
+            key(uid) {
+                LenscribeWorkspace(
+                    currentUserId = uid,
+                    displayName = user.displayName ?: "Workspace User",
+                    email = user.email,
+                    isDarkTheme = isDarkTheme,
+                    screenShieldEnabled = screenShieldEnabled,
+                    onToggleTheme = onToggleTheme,
+                    onToggleScreenShield = onToggleScreenShield
+                )
+            }
         }
     }
 }
@@ -240,21 +267,46 @@ private fun LenscribeWorkspace(
             snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
             bottomBar = {
                 if (!useRail) {
-                    NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
-                        LenscribeTab.entries.forEach { tab ->
-                            val selected = currentTab == tab
-                            NavigationBarItem(
-                                selected = selected,
-                                onClick = { currentTab = tab },
-                                icon = {
-                                    Icon(
-                                        imageVector = if (selected) tab.selectedIcon else tab.unselectedIcon,
-                                        contentDescription = stringResource(tab.labelRes)
-                                    )
-                                },
-                                label = { Text(stringResource(tab.labelRes)) },
-                                modifier = Modifier.testTag("nav_${tab.routeId}")
-                            )
+                    Column {
+                        HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.outlineVariant)
+                        NavigationBar(
+                            containerColor = MaterialTheme.colorScheme.surface,
+                            tonalElevation = 0.dp
+                        ) {
+                            LenscribeTab.entries.forEach { tab ->
+                                val selected = currentTab == tab
+                                val iconScale by animateFloatAsState(
+                                    targetValue = if (selected) 1.12f else 1.0f,
+                                    animationSpec = spring(
+                                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                                        stiffness = Spring.StiffnessMedium
+                                    ),
+                                    label = "nav_icon_scale_${tab.routeId}"
+                                )
+                                NavigationBarItem(
+                                    selected = selected,
+                                    onClick = { currentTab = tab },
+                                    colors = NavigationBarItemDefaults.colors(
+                                        selectedIconColor = MaterialTheme.colorScheme.primary,
+                                        selectedTextColor = MaterialTheme.colorScheme.primary,
+                                        indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                                        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                    ),
+                                    icon = {
+                                        Icon(
+                                            imageVector = if (selected) tab.selectedIcon else tab.unselectedIcon,
+                                            contentDescription = stringResource(tab.labelRes),
+                                            modifier = Modifier.graphicsLayer {
+                                                scaleX = iconScale
+                                                scaleY = iconScale
+                                            }
+                                        )
+                                    },
+                                    label = { Text(stringResource(tab.labelRes)) },
+                                    modifier = Modifier.testTag("nav_${tab.routeId}")
+                                )
+                            }
                         }
                     }
                 }
@@ -273,13 +325,32 @@ private fun LenscribeWorkspace(
                         Spacer(modifier = Modifier.weight(0.2f))
                         LenscribeTab.entries.forEach { tab ->
                             val selected = currentTab == tab
+                            val iconScale by animateFloatAsState(
+                                targetValue = if (selected) 1.12f else 1.0f,
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                                    stiffness = Spring.StiffnessMedium
+                                ),
+                                label = "rail_icon_scale_${tab.routeId}"
+                            )
                             NavigationRailItem(
                                 selected = selected,
                                 onClick = { currentTab = tab },
+                                colors = NavigationRailItemDefaults.colors(
+                                    selectedIconColor = MaterialTheme.colorScheme.primary,
+                                    selectedTextColor = MaterialTheme.colorScheme.primary,
+                                    indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                ),
                                 icon = {
                                     Icon(
                                         imageVector = if (selected) tab.selectedIcon else tab.unselectedIcon,
-                                        contentDescription = stringResource(tab.labelRes)
+                                        contentDescription = stringResource(tab.labelRes),
+                                        modifier = Modifier.graphicsLayer {
+                                            scaleX = iconScale
+                                            scaleY = iconScale
+                                        }
                                     )
                                 },
                                 label = { Text(stringResource(tab.labelRes)) },
@@ -288,10 +359,27 @@ private fun LenscribeWorkspace(
                         }
                         Spacer(modifier = Modifier.weight(1f))
                     }
+                    VerticalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.outlineVariant)
                 }
 
-                Box(modifier = Modifier.weight(1f).fillMaxSize()) {
-                    when (currentTab) {
+                AnimatedContent(
+                    targetState = currentTab,
+                    transitionSpec = {
+                        val forward = targetState.ordinal >= initialState.ordinal
+                        val slideIn = slideInHorizontally(
+                            animationSpec = tween(durationMillis = 220, easing = FastOutSlowInEasing),
+                            initialOffsetX = { fullWidth -> if (forward) fullWidth / 16 else -fullWidth / 16 }
+                        ) + fadeIn(animationSpec = tween(durationMillis = 220))
+                        val slideOut = slideOutHorizontally(
+                            animationSpec = tween(durationMillis = 160, easing = FastOutSlowInEasing),
+                            targetOffsetX = { fullWidth -> if (forward) -fullWidth / 20 else fullWidth / 20 }
+                        ) + fadeOut(animationSpec = tween(durationMillis = 150))
+                        slideIn.togetherWith(slideOut)
+                    },
+                    modifier = Modifier.weight(1f).fillMaxSize(),
+                    label = "workspace_tab_transition"
+                ) { activeTab ->
+                    when (activeTab) {
                         LenscribeTab.SCAN -> {
                             ScannerScreen(
                                 profile = profile,

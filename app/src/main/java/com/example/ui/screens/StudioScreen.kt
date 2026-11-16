@@ -4,6 +4,14 @@ import android.graphics.Bitmap
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -62,6 +70,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.export.DocumentExporter
 import com.example.imaging.ImagePreprocessor
+import com.example.ui.components.StudioPulsePlaceholder
+import com.example.ui.components.smoothCardSize
 import com.example.viewmodel.ImageStudioState
 import com.google.firebase.ai.type.AspectRatio
 import kotlinx.coroutines.Dispatchers
@@ -201,11 +211,17 @@ fun StudioScreen(
                 }
             }
 
-            if (isEditMode) {
+            AnimatedVisibility(
+                visible = isEditMode,
+                enter = expandVertically(tween(220)) + fadeIn(tween(200)),
+                exit = shrinkVertically(tween(160)) + fadeOut(tween(140))
+            ) {
                 Card(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .smoothCardSize()
                 ) {
                     Column(
                         modifier = Modifier.padding(14.dp),
@@ -244,7 +260,7 @@ fun StudioScreen(
                                     .fillMaxWidth()
                                     .height(190.dp)
                                     .clip(MaterialTheme.shapes.small)
-                                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+                                    .background(MaterialTheme.colorScheme.surfaceVariant)
                             )
                         } else {
                             Text(
@@ -260,7 +276,9 @@ fun StudioScreen(
             Card(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .smoothCardSize()
             ) {
                 Column(
                     modifier = Modifier.padding(14.dp),
@@ -347,110 +365,90 @@ fun StudioScreen(
                 }
             }
 
-            when (studioState) {
-                is ImageStudioState.Idle -> Unit
-                is ImageStudioState.Generating -> {
-                    Surface(
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
-                        shape = MaterialTheme.shapes.medium,
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(220.dp)
-                    ) {
-                        Column(
-                            modifier = Modifier.fillMaxSize(),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
+            AnimatedContent(
+                targetState = studioState,
+                transitionSpec = { fadeIn(tween(220)).togetherWith(fadeOut(tween(150))) },
+                label = "studio_result_state"
+            ) { currentStudio ->
+                when (currentStudio) {
+                    is ImageStudioState.Idle -> Unit
+                    is ImageStudioState.Generating -> {
+                        StudioPulsePlaceholder()
+                    }
+                    is ImageStudioState.Error -> {
+                        Surface(
+                            color = MaterialTheme.colorScheme.errorContainer,
+                            shape = MaterialTheme.shapes.medium,
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            CircularProgressIndicator()
-                            Spacer(modifier = Modifier.height(12.dp))
                             Text(
-                                text = "Rendering high-resolution image...",
-                                style = MaterialTheme.typography.titleSmall,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = "This usually completes within 20 to 50 seconds.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                text = currentStudio.message,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                modifier = Modifier.padding(14.dp)
                             )
                         }
                     }
-                }
-                is ImageStudioState.Error -> {
-                    Surface(
-                        color = MaterialTheme.colorScheme.errorContainer,
-                        shape = MaterialTheme.shapes.medium,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(
-                            text = studioState.message,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onErrorContainer,
-                            modifier = Modifier.padding(14.dp)
-                        )
-                    }
-                }
-                is ImageStudioState.Ready -> {
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(14.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                    is ImageStudioState.Ready -> {
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)),
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            Image(
-                                bitmap = studioState.bitmap.asImageBitmap(),
-                                contentDescription = "Studio generated result",
-                                contentScale = ContentScale.Fit,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(300.dp)
-                                    .clip(MaterialTheme.shapes.medium)
-                                    .border(1.dp, MaterialTheme.colorScheme.outline, MaterialTheme.shapes.medium)
-                            )
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            Column(
+                                modifier = Modifier.padding(14.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
-                                OutlinedButton(
-                                    onClick = {
-                                        pendingSaveBitmap = studioState.bitmap
-                                        savePngLauncher.launch("lenscribe-studio-${System.currentTimeMillis()}.png")
-                                    },
+                                Image(
+                                    bitmap = currentStudio.bitmap.asImageBitmap(),
+                                    contentDescription = "Studio generated result",
+                                    contentScale = ContentScale.Fit,
                                     modifier = Modifier
-                                        .weight(1f)
+                                        .fillMaxWidth()
+                                        .height(300.dp)
+                                        .clip(MaterialTheme.shapes.medium)
+                                        .border(1.dp, MaterialTheme.colorScheme.outline, MaterialTheme.shapes.medium)
+                                )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    OutlinedButton(
+                                        onClick = {
+                                            pendingSaveBitmap = currentStudio.bitmap
+                                            savePngLauncher.launch("lenscribe-studio-${System.currentTimeMillis()}.png")
+                                        },
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .defaultMinSize(minHeight = 48.dp)
+                                    ) {
+                                        Icon(Icons.Filled.Download, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Save PNG")
+                                    }
+                                    OutlinedButton(
+                                        onClick = {
+                                            DocumentExporter.shareBitmap(context, currentStudio.bitmap)
+                                        },
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .defaultMinSize(minHeight = 48.dp)
+                                    ) {
+                                        Icon(Icons.Filled.Share, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Share")
+                                    }
+                                }
+                                Button(
+                                    onClick = onSendResultToScanner,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
                                         .defaultMinSize(minHeight = 48.dp)
                                 ) {
-                                    Icon(Icons.Filled.Download, contentDescription = null, modifier = Modifier.size(16.dp))
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Save PNG")
+                                    Icon(Icons.Filled.DocumentScanner, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Send to Scanner Queue")
                                 }
-                                OutlinedButton(
-                                    onClick = {
-                                        DocumentExporter.shareBitmap(context, studioState.bitmap)
-                                    },
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .defaultMinSize(minHeight = 48.dp)
-                                ) {
-                                    Icon(Icons.Filled.Share, contentDescription = null, modifier = Modifier.size(16.dp))
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Share")
-                                }
-                            }
-                            Button(
-                                onClick = onSendResultToScanner,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .defaultMinSize(minHeight = 48.dp)
-                            ) {
-                                Icon(Icons.Filled.DocumentScanner, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Send to Scanner Queue")
                             }
                         }
                     }
